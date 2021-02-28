@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const mongodb = require("mongodb");
 const generateUniqueId = require("generate-unique-id");
-const { url } = require("inspector");
 
 
 const URL = "mongodb+srv://binaryblaze:1234@cluster0.v9zgd.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
@@ -76,4 +75,6 @@ app.get("/short/:id", async (req, res) => {
 });
 
 
-app.listen(process.env.PORT || 8080);
+app.listen(process.env.PORT || 8080, function(){
+    console.log("Express server listening on port %d in %s mode", this.address().port, app.settings.env);
+  });
