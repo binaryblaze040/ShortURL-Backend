@@ -30,7 +30,7 @@ app.get("/urls", async (req, res) => {
 
 // generate a short url
 app.post("/generateurl", async (req, res) => {
-    
+    console.log(req.body);
     try {
         const id = generateUniqueId(
             {
@@ -51,7 +51,7 @@ app.post("/generateurl", async (req, res) => {
         
         await connection.close();
 
-        res.status(200).send("short/" + id);
+        res.status(200).json({"id" : id});
 
     } catch (error) {
         res.status(500).send("Failed to generate! " + error);
