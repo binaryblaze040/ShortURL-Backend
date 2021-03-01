@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const mongodb = require("mongodb");
 const generateUniqueId = require("generate-unique-id");
+const bcrypt = require("bcryptjs");
 
 
 const URL = "mongodb+srv://binaryblaze:1234@cluster0.v9zgd.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
@@ -23,14 +24,16 @@ app.get("/urls", async (req, res) => {
         res.status(200).json(urls);
 
     } catch (error) {
-        res.status(500).send(error);
+        res.status(500).json({
+            message : error
+        });
     }  
 });
 
 
 // generate a short url
 app.post("/generateurl", async (req, res) => {
-    console.log(req.body);
+
     try {
         const id = generateUniqueId(
             {
@@ -54,7 +57,9 @@ app.post("/generateurl", async (req, res) => {
         res.status(200).json({"id" : id});
 
     } catch (error) {
-        res.status(500).send("Failed to generate! " + error);
+        res.status(500).json({
+            message : error
+        });
     }
 });
 
@@ -70,11 +75,116 @@ app.get("/short/:id", async (req, res) => {
         res.status(200).redirect(urls.url);
 
     } catch (error) {
-        res.status(500).send(error);
+        res.status(500).json({
+            message : error
+        });
     }  
 });
 
 
-app.listen(process.env.PORT || 8080, function(){
-    console.log("Express server listening on port %d in %s mode", this.address().port, app.settings.env);
-  });
+// delete url
+app.delete("/delete/:id", async (req, res) => {
+    try{
+        let connection = await mongodb.MongoClient.connect(URL);
+        let db = connection.db(DB);
+        await db.collection("urls").findOneAndDelete({shorturl : "short/" + req.params.id});
+        await connection.close();
+
+        res.status(200).json({ message : "Deleted!" });
+
+    } catch (error) {
+        res.status(500).json({
+            message : error
+        });
+    }
+});
+
+
+// register user
+app.post("/register", async (req, res) => {
+    try {
+        let salt = await bcrypt.genSalt(10);
+        let hashPassword = await bcrypt.hash(req.body.password, salt);
+        let newUser = {
+            firstname : req.body.fname,
+            lastname : req.body.lname,
+            email : req.body.email,
+            password : hashPassword
+        };
+
+        let connection = await mongodb.MongoClient.connect(URL);
+        let db = connection.db(DB);
+        
+        let emailExists = await db.collection("users").find(
+            {
+                email : req.body.email
+            }
+        ).toArray();
+        
+        if(emailExists.length == 0)
+        {
+            await db.collection("users").insertOne(newUser);
+            await connection.close();
+
+            res.status(200).json({
+                message : "User Created!"
+            });
+        }
+        else
+        {
+            await connection.close();
+            res.status(409).json({
+                message : "Email already exists!"
+            });
+        }       
+
+    } catch (error) {
+        res.status(500).json({
+            message : error
+        });
+    }
+});
+
+// user login
+app.post("/login", async (req, res) => {
+    
+    try {
+        let connection = await mongodb.MongoClient.connect(URL);
+        let db = connection.db(DB);
+        
+        let user = await db.collection("users").findOne(
+            {
+                email : req.body.email
+            }
+        );
+        
+        if(user)
+        {
+            let validPassword = await bcrypt.compare(req.body.password, user.password);
+            
+            if(validPassword)
+            {
+                await connection.close();
+                res.status(200).json({
+                    name : user.firstname + " " + user.lastname
+                });
+            }
+            else
+                res.status(401).json({
+                    message : "Worng Password!"
+                });
+        }
+        else
+        {
+            await connection.close();
+            res.status(404).json({ message : "User not found!" });      
+        }
+    } catch (error) {
+        res.status(500).json({
+            message : error
+        });
+    }
+});
+
+
+app.listen(process.env.PORT || 8080);
